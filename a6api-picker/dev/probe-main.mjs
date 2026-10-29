@@ -18,7 +18,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const dataRoot = mkdtempSync(join(tmpdir(), 'cindy-a6api-main-'));
+const dataRoot = process.env.A6API_PROBE_DATA_ROOT || mkdtempSync(join(tmpdir(), 'cindy-a6api-main-'));
+const keepData = Boolean(process.env.A6API_PROBE_DATA_ROOT);
 const workerData = join(dataRoot, 'worker');
 mkdirSync(workerData, { recursive: true });
 const fsRoot = join(dataRoot, 'data');
@@ -295,13 +296,20 @@ if (hostHandler) {
   console.log('\n## 20. 工具 —— 未注册 onHostMessage，跳过');
 }
 
-console.log('\n## 21. 落盘检查（插件数据目录）');
-for (const name of ['last.json', 'favorites.json']) {
+console.log('\n## 21. 筛选条件：改了就存（filters/save → filters/get，落插件数据目录）');
+const saveRes = await rpc('filters/save', { filters: { model: MODEL, brand: 'DeepSeek', minSr: 95, maxRatio: 0.1, guaranteed: true, onlyQualified: true } });
+console.log('save: ' + JSON.stringify(saveRes.ok));
+const getRes = await rpc('filters/get', {});
+console.log('get:  ' + JSON.stringify(getRes.filters));
+
+console.log('\n## 22. 落盘检查（插件数据目录）');
+for (const name of ['last.json', 'favorites.json', 'filters.json']) {
   const file = join(fsRoot, name);
   console.log(name + ': ' + (existsSync(file) ? readFileSync(file, 'utf8').length + ' bytes' : '缺失'));
 }
+console.log('dataRoot: ' + dataRoot);
 
 child.stdin.end();
 await new Promise((r) => setTimeout(r, 200));
-rmSync(dataRoot, { recursive: true, force: true });
+if (!keepData) rmSync(dataRoot, { recursive: true, force: true });
 process.exit(0);

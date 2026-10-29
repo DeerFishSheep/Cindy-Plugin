@@ -130,3 +130,14 @@ python3 dev/pack.py          # 生成 .cindy（不打也行，用户自己打）
 4. **`login/cookie` 的用户 ID**：站点现在要求 `new-api-user` 头，纯 Cookie 调
    `/api/user/self` 会 401。worker 改成先解 session cookie 里的 ID，再用拉令牌列表验证；
    上游 `fetchUserId` 那条老路只在解不出 ID 时兜底。
+
+## 筛选条件持久化（1.1.1）
+
+筛选条件（模型、品牌、倍率上限、缓存/成功率下限、首字、吞吐、样本数、仅保真、只输出达标）存在
+**插件数据目录** `ghost-fs data/filters.json`，和 `last.json`（榜单快照）、`favorites.json`（收藏）同一处：
+
+- 改完输入框/勾选框 400ms 防抖后自动 `filters/save`，不必等点「开始筛选」
+- 打开面板时 `filters/get` 回填；回填期间不触发自动保存，避免写回半截状态
+- 「显示上次结果」不再用 `last.params.model` 覆盖已保存的筛选条件
+
+早期版本存在插件 `/kv`，实测未落库（kv 里只有 userId/tokenId），1.1.1 起改走 ghost-fs。

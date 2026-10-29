@@ -143,6 +143,12 @@
       // ── 筛选条件持久化 ──────────────────────────────────────────────────────
 
       const FILTER_IDS = ["model", "brand", "maxRatio", "minCache", "minSr", "maxTtft", "minTps", "minSample", "guaranteed", "onlyQualified"];
+      /** 回填期间不触发自动保存，否则会把半截状态写回去 */
+      let restoringFilters = false;
+      /** 本地是否读到了上次保存的筛选条件 */
+      let savedFiltersLoaded = false;
+      /** 保存失败只提醒一次，别每次输入都弹 */
+      let filtersSaveWarned = false;
 
       function readFilters() {
         const out = {};
@@ -164,14 +170,43 @@
       }
 
       function saveFilters() {
-        // Cindy：localStorage 在 cindy-ghost 沙箱里不保证持久，改存插件 /kv。
-        invoke("filters/save", { filters: readFilters() }).catch(() => {});
+        // 筛选条件存 Cindy 插件数据目录（ghost-fs data/filters.json），
+        // 和 last.json / favorites.json 同一处；localStorage 在沙箱里不保证持久。
+        invoke("filters/save", { filters: readFilters() }).catch((error) => {
+          if (!filtersSaveWarned) {
+            filtersSaveWarned = true;
+            toast(`筛选条件没能保存：${error.message}`, true);
+          }
+        });
+      }
+
+      /** 改完就存（拖输入框时防抖），不必等点「开始筛选」。 */
+      function bindFilterPersistence() {
+        let timer = null;
+        const queue = () => {
+          clearTimeout(timer);
+          timer = setTimeout(() => {
+            if (restoringFilters) return;
+            saveFilters();
+          }, 400);
+        };
+        for (const id of FILTER_IDS) {
+          const node = $(id);
+          if (!node) continue;
+          const evt = node.type === "checkbox" || node.tagName === "SELECT" ? "change" : "input";
+          node.addEventListener(evt, queue);
+        }
       }
 
       async function loadSavedFilters() {
         try {
           const r = await invoke("filters/get");
-          if (r && r.filters) writeFilters(r.filters);
+          if (r && r.filters) {
+            restoringFilters = true;
+            writeFilters(r.filters);
+            restoringFilters = false;
+            savedFiltersLoaded = true;
+          }
         } catch {}
       }
 
@@ -998,6 +1033,7 @@
         await syncAppearance();
         try { bridge?.on?.("appearance:changed", applyTheme); } catch {}
         await loadSavedFilters();
+        bindFilterPersistence();
         if (!$("model").value) $("model").value = "deepseek-v4.1-flash";
 
         await loadSession();
@@ -1016,7 +1052,8 @@
           const last = await invoke("a6api.last");
           if (last?.data) {
             data = last.data;
-            if (last.params?.model) $("model").value = last.params.model;
+            // 上次结果的模型不能覆盖用户存下来的筛选条件（否则下次打开会“变回”旧的模型）
+            if (last.params?.model && !savedFiltersLoaded) $("model").value = last.params.model;
             renderResult();
             msg(`显示上次结果（${last.data.kept} 个合格）`, "");
             refreshPinned();

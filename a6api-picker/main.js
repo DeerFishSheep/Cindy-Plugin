@@ -16,6 +16,7 @@
 const CHANNEL = 'a6api-picker';
 const LAST_FILE = 'last.json';
 const FAV_FILE = 'favorites.json';
+const FILTERS_FILE = 'filters.json';
 
 /** 与 pi-a6api 0.3.10 的 ALGO_VERSION 保持一致；算法口径一变就递增，旧快照自动作废。 */
 const ALGO_VERSION = 75;
@@ -443,14 +444,23 @@ const METHODS = {
   'fav/set': favSet,
   'fav/refresh': favRefresh,
 
-  // 面板筛选条件（上游用 localStorage；Cindy 存 /kv）
+  // 面板筛选条件（上游用 localStorage；Cindy 存插件数据目录 filters.json，
+  // 与 last.json / favorites.json 同一处：Cindy 的 ghost-fs data 目录）
   async 'filters/get'() {
-    const kv = await readKv();
-    return { ok: true, filters: kv.filters && typeof kv.filters === 'object' ? kv.filters : null };
+    const text = await readDataFile(FILTERS_FILE);
+    if (!text) return { ok: true, filters: null };
+    try {
+      const v = JSON.parse(text);
+      return { ok: true, filters: v && typeof v === 'object' && !Array.isArray(v) ? v : null };
+    } catch {
+      return { ok: true, filters: null };
+    }
   },
   async 'filters/save'(p) {
-    await writeKv({ filters: p.filters && typeof p.filters === 'object' ? p.filters : null });
-    return { ok: true };
+    const filters = p.filters && typeof p.filters === 'object' ? p.filters : null;
+    if (!filters) return { ok: false, error: '缺少 filters' };
+    const ok = await writeDataFile(FILTERS_FILE, JSON.stringify(filters));
+    return ok ? { ok: true } : { ok: false, error: '筛选条件写入失败' };
   },
 
   // 设置页状态 / 通用配置写回
