@@ -94,6 +94,24 @@ for (const rel of ownCode) {
   }
 }
 
+// 面板调用的每个通道都要能被 bridge 解析（否则只会在运行时弹「未知通道」）。
+{
+  const panel = readFileSync(join(root, 'panel.js'), 'utf8');
+  const mapBlock = panel.slice(panel.indexOf('const RPC = {'), panel.indexOf('};', panel.indexOf('const RPC = {')));
+  const mapped = new Set([...mapBlock.matchAll(/"([^"]+)":\s*"/g)].map((m) => m[1]));
+  const mainJs = readFileSync(join(root, 'main.js'), 'utf8');
+  const methods = new Set([...mainJs.matchAll(/'(\w+\/[\w/-]+)'\s*[:(]/g)].map((m) => m[1]));
+  const used = [...panel.matchAll(/invoke\("([^"]+)"/g)].map((m) => m[1]);
+  for (const ch of used) {
+    if (ch === 'app.getAppearance' || ch.includes('*')) continue;
+    const ok = mapped.has(ch) || ch.includes('/');
+    check(ok, '面板通道可解析：' + ch);
+    if (ok && ch.includes('/') && !mapped.has(ch)) {
+      check(methods.has(ch), '面板直通的 RPC 方法在 main.js 存在：' + ch);
+    }
+  }
+}
+
 // 包大小 / 文件数。
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {

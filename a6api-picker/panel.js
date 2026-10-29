@@ -51,7 +51,7 @@
       const bridge = {
         async invoke(channel, payload) {
           if (channel === "app.getAppearance") return { base: detectTheme() };
-          const method = RPC[channel];
+          const method = RPC[channel] || (channel.includes("/") ? channel : null);
           if (!method) throw new Error("未知通道：" + channel);
           return window.A6Bridge.request(method, payload ?? {});
         },
