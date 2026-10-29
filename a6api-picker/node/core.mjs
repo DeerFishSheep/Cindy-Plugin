@@ -132,7 +132,7 @@ function explain(err) {
 
 async function requestOnce(method, url, hdrs, body) {
   const MARK = '\n#HTTP#';
-  const args = ['-sS', '--max-time', '30', '--compressed', '--http1.1', '-X', method];
+  const args = ['-sS', '--max-time', '20', '--compressed', '--http1.1', '-X', method];
   for (const [k, v] of Object.entries(hdrs)) args.push('-H', k + ': ' + v);
   if (body !== undefined && body !== null) args.push('--data-binary', JSON.stringify(body));
   args.push('-w', MARK + '%{http_code}', url.toString());
@@ -179,7 +179,7 @@ function headers(cred) {
  * 抓一页渠道数据。
  * 先走登录态接口（认 token_id、带固定状态），401 时退回公开接口。
  */
-export async function fetchPage({ page = 1, pageSize = 100, model, brand, tokenId, cred, routeStatus, guaranteedOnly } = {}) {
+export async function fetchPage({ page = 1, pageSize = 100, model, brand, tokenId, cred, routeStatus, guaranteedOnly, scope: preferScope } = {}) {
   const build = (path) => {
     const u = new URL(path, BASE);
     u.searchParams.set('page', String(page));
@@ -193,8 +193,10 @@ export async function fetchPage({ page = 1, pageSize = 100, model, brand, tokenI
   };
 
   let scope = 'auth';
-  let res = await httpGet(build(PATH_AUTH), headers(cred));
-  if (!res.ok) {
+  // scope 可由调用方指定：一次 collect 里第一页探明该用哪个接口后，后面几页直接走，
+  // 不再每页都先打一次必然失败的 auth 请求 —— 未登录时那等于 6 次白跑。
+  let res = await httpGet(build(preferScope === 'public' ? PATH_PUBLIC : PATH_AUTH), headers(cred));
+  if (!res.ok && !preferScope) {
     scope = 'public';
     res = await httpGet(build(PATH_PUBLIC), headers(cred));
   }
@@ -395,24 +397,32 @@ export async function collect(opt = {}) {
   let tokenId = opt.tokenId || null;
   let tokenName = null;
 
-  for (let page = 1; page <= maxPages; page++) {
-    const d = await fetchPage({
-      page,
-      pageSize,
-      model: opt.model,
-      brand: opt.brand,
-      tokenId,
-      cred: opt.cred,
-      guaranteedOnly: opt.guaranteedOnly === true
-    });
-    scope = d.scope || scope;
-    if (page === 1) {
-      total = d.total || 0;
-      if (d.query && d.query.token_id) tokenId = d.query.token_id;
-    }
-    const items = d.items || [];
-    all.push(...items);
-    if (items.length < pageSize || all.length >= total) break;
+  // 先拉第一页 —— 它带回 total，才知道后面要拉几页。
+  // 原实现逐页串行 await，6 页要 30 秒；这里第一页之后并发拉剩余页，实测降到 6 秒级。
+  const build = (page) => ({
+    page,
+    pageSize,
+    model: opt.model,
+    brand: opt.brand,
+    tokenId,
+    cred: opt.cred,
+    guaranteedOnly: opt.guaranteedOnly === true
+  });
+
+  const first = await fetchPage(build(1));
+  scope = first.scope || scope;
+  total = first.total || 0;
+  if (first.query && first.query.token_id) tokenId = first.query.token_id;
+  all.push(...(first.items || []));
+
+  const pages = Math.min(maxPages, Math.ceil(total / pageSize) || 1);
+  if (pages > 1) {
+    // 单页失败不该让整次查询失败：扔掉那一页，其余照常参与排名。
+    // build() 每次读最新的 tokenId（第一页可能刚把它换成账号默认令牌）。
+    const rest = await Promise.all(
+      Array.from({ length: pages - 1 }, (_, i) => fetchPage({ ...build(i + 2), scope }).catch(() => null))
+    );
+    for (const d of rest) if (d) all.push(...(d.items || []));
   }
 
   const packed = all.map(pack);
@@ -439,20 +449,34 @@ export async function collect(opt = {}) {
 // ---------- 登录凭据与账号接口 ----------
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 
-// Cindy 改写点（唯一）：原项目固定写 ~/.dsh；Cindy 侧由 worker 把 A6API_DATA_DIR
-// 指到自己的临时目录，持久凭据/配置改由宿主保险库与 /kv 管理。留缺省值是为了让
-// 这段代码仍可单独当 CLI 用。
-const DATA_DIR = process.env.A6API_DATA_DIR || join(homedir(), '.dsh');
-const CRED_DIR = DATA_DIR;
-const CRED_FILE = join(CRED_DIR, 'a6api-session.json');
+/**
+ * 凭据/缓存放哪。
+ *
+ * Cindy 改写点（唯一）：上游默认写 ~/.dsh，Cindy 插件不允许写别的产品的目录。
+ * 这里改成 A6API_DATA_DIR（worker 启动时指向系统临时目录，只用来放 Chrome
+ * Cookies 的临时拷贝和模型列表缓存）或 setDataDir() 显式指定。
+ * 登录态本身由宿主保险库保管，不落这里。
+ */
+let DATA_DIR =
+  process.env.A6API_DATA_DIR ||
+  join(tmpdir(), 'a6api-picker-cindy-' + (typeof process.getuid === 'function' ? process.getuid() : 'u'));
+export function setDataDir(dir) {
+  if (dir) DATA_DIR = dir;
+}
+export function dataDir() {
+  return DATA_DIR;
+}
+
+const credFile = () => join(DATA_DIR, 'a6api-session.json');
 
 export function loadSession() {
   try {
-    if (!existsSync(CRED_FILE)) return null;
-    return JSON.parse(readFileSync(CRED_FILE, 'utf8'));
+    const file = credFile();
+    if (!existsSync(file)) return null;
+    return JSON.parse(readFileSync(file, 'utf8'));
   } catch {
     return null;
   }
@@ -460,8 +484,8 @@ export function loadSession() {
 
 export function saveSession(sess) {
   try {
-    if (!existsSync(CRED_DIR)) mkdirSync(CRED_DIR, { recursive: true });
-    writeFileSync(CRED_FILE, JSON.stringify(sess, null, 2), { mode: 0o600 });
+    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(credFile(), JSON.stringify(sess, null, 2), { mode: 0o600 });
     return true;
   } catch {
     return false;
@@ -470,7 +494,7 @@ export function saveSession(sess) {
 
 export function clearSession() {
   try {
-    writeFileSync(CRED_FILE, '{}', { mode: 0o600 });
+    writeFileSync(credFile(), '{}', { mode: 0o600 });
     return true;
   } catch {
     return false;
@@ -497,7 +521,7 @@ export async function postJson(path, body, cred) {
 export async function loginWithPassword(username, password, jarPath) {
   const MARK = '\n#HTTP#';
   const args = [
-    '-sS', '--max-time', '30', '--http1.1',
+    '-sS', '--max-time', '20', '--http1.1',
     '-c', jarPath,
     '-X', 'POST',
     '-H', 'User-Agent: ' + UA,
@@ -587,17 +611,22 @@ export async function fetchBalance(cred) {
     statusMeta = {
       ts: Date.now(),
       perUnit: Number(st.quota_per_unit) || 500000,
-      fx: Number(st.usd_exchange_rate) || 7.3
+      // 汇率只认站点实际生效的 payment_fx_rate_cny_per_usd（如 6.6681）。
+      // usd_exchange_rate 是 New API 遗留的 7.3，跟官网显示的 ¥ 对不上，不用它。
+      fx: Number(st.payment_fx_rate_cny_per_usd) || null
     };
   }
 
   const self = ((await selfRes.json()) || {}).data || {};
   const usd = Number(self.quota || 0) / statusMeta.perUnit;
+  // 站点不给汇率就不折人民币（返回 null，前端退回显示美元），不猜一个固定值
+  const toCny = (q) =>
+    statusMeta.fx ? Math.round((Number(q || 0) / statusMeta.perUnit) * statusMeta.fx * 100) / 100 : null;
   return {
-    cny: Math.round(usd * statusMeta.fx * 100) / 100,
+    cny: toCny(self.quota),
     usd: Math.round(usd * 10000) / 10000,
     quota: Number(self.quota || 0),
-    usedCny: Math.round((Number(self.used_quota || 0) / statusMeta.perUnit) * statusMeta.fx * 100) / 100,
+    usedCny: toCny(self.used_quota),
     requests: Number(self.request_count || 0)
   };
 }
@@ -679,7 +708,6 @@ export function importBrowserCookie(host = 'a6api.com') {
       if (!existsSync(src)) continue;
       const tmp = join(DATA_DIR, '.a6api-ck-' + process.pid + '.db');
       try {
-        mkdirSync(DATA_DIR, { recursive: true });
         copyFileSync(src, tmp);
         const out = execFileSync('sqlite3', [
           tmp,

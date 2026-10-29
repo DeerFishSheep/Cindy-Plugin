@@ -2,9 +2,10 @@
   "schemaVersion": 3,
   "id": "a6api-picker",
   "name": "A6API 渠道筛选",
-  "description": "在右侧栏打开 A6API 渠道面板：按模型/品牌/令牌筛选，按有效率、价格、稳定性、首字、吞吐五项打分排名，对比两家渠道，一键固定或禁用渠道，并查看账号余额。登录可复用本机 Chrome 里已有的 a6api.com 登录态。",
-  "whenToUse": "需要筛选、评分、对比 A6API 商家渠道，查看渠道首字/吞吐/成功率/缓存命中率，固定或禁用某个渠道，查 A6API 余额时找我；也可以直接在对话里让 AI 拉一份渠道榜单。",
-  "version": "1.0.0",
+  "description": "在右侧栏挑 A6API 上游渠道：按品牌/模型/缓存/成功率/倍率/首字/吞吐/样本数筛选，出综合分榜与性价比榜，把单位成本算成 ¥/亿（按各渠道 24h 缓存命中率拆分）；可收藏渠道并刷新快照、对比两家、复制榜单，登录后固定或禁用渠道、看余额与令牌。登录支持浏览器同步、粘贴 Cookie、账号密码三路。",
+  "whenToUse": "需要筛选、评分、对比 A6API 商家渠道，看渠道首字/吞吐/成功率/缓存命中率/单位成本，收藏常用渠道，固定或禁用某个渠道，查 A6API 余额时找我；也可以直接在对话里让 AI 拉一份综合榜与性价比榜。",
+  "version": "1.1.0",
+  "releaseNotes": "对齐上游 pi-a6api 0.3.10：新增收藏（按模型+渠道 ID 存快照、未在榜标红、收藏页刷新）、筛选条件补齐倍率/首字/吞吐/样本数/仅保真、账号密码登录、性价比榜与综合榜双榜、面板重做为上游完整界面；core.mjs 换到新版（并发翻页、按 payment_fx_rate_cny_per_usd 折算人民币、byValue 乘法模型）。",
   "minCindyVersion": "0.1.119",
   "entry": "main.js",
   "icon": "assets/icon.png",
@@ -19,7 +20,7 @@
   "tools": [
     {
       "name": "a6api_channel_search",
-      "description": "拉取 A6API 的渠道榜单并返回文字摘要。按模型筛选渠道，用固定工作量（1000 万输入 + 2.5 万输出）算成本，按有效率/价格/稳定性/首字/吞吐五项各 20% 打分。用户问“哪个 A6API 渠道好/便宜/快”、要对比商家、或想固定渠道时用。需要固定/禁用渠道请让用户在右侧栏面板里操作。",
+      "description": "拉取 A6API 的渠道榜单并返回文字摘要（综合分榜 + 性价比榜）。按模型筛选渠道，成本按 1 亿输入 + 25 万输出 token、并折算各渠道自己的 24h 缓存命中率算成人民币；综合分由稳定性/成功率/延迟/缓存/价格加权，性价比榜是性能分 × 价格分。用户问“哪个 A6API 渠道好/便宜/快”、要对比商家时用。固定、禁用、收藏渠道请让用户在右侧栏「A6API 渠道」面板里操作。",
       "parameters": {
         "type": "object",
         "properties": {
@@ -55,9 +56,17 @@
             "type": "number",
             "description": "样本数下限。可选。"
           },
+          "guaranteed": {
+            "type": "boolean",
+            "description": "只看保真渠道（该模型的保真池）。可选。"
+          },
+          "onlyQualified": {
+            "type": "boolean",
+            "description": "只输出达标渠道，默认 true；false 时把不达标的也列出来。可选。"
+          },
           "limit": {
             "type": "number",
-            "description": "返回多少条，默认 10，最多 30。"
+            "description": "综合榜返回多少条，默认 10，最多 30。性价比榜固定前 5。"
           }
         },
         "required": ["model"]
@@ -73,18 +82,19 @@
       {
         "key": "a6api_cookie",
         "label": "A6API Cookie",
-        "hint": "在浏览器登录 a6api.com 后，从开发者工具任意请求头复制整串 Cookie；也可以点面板里的“同步浏览器登录”自动读取。",
+        "hint": "在浏览器登录 a6api.com 后，从开发者工具任意请求头复制整串 Cookie；也可以点面板里的“同步浏览器登录”，或用设置页的账号密码登录。",
         "url": "https://a6api.com/",
         "methods": [
           "search/run",
           "models/list",
           "brands/list",
-          "session/probe",
           "tokens/list",
+          "balance/get",
           "pin/current",
           "pin/set",
           "disable/channel",
-          "balance/get"
+          "status/probe",
+          "login/cookie"
         ]
       }
     ]

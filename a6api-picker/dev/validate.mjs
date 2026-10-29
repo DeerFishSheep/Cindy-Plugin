@@ -81,10 +81,11 @@ checkHtml('panel.html');
 checkHtml('settings.html');
 
 // 代码红线（我们自己的文件）。
-const ownCode = ['main.js', 'bridge.js', 'panel.js', 'settings.js', 'node/worker.cjs'];
+const ownCode = ['main.js', 'bridge.js', 'panel.js', 'settings.js', 'node/worker.cjs', 'node/core.mjs'];
 for (const rel of ownCode) {
   const text = readFileSync(join(root, rel), 'utf8');
-  check(!text.includes("join(homedir(), '.dsh')"), rel + ' 不写 ~/.dsh');
+  check(!text.includes("'.dsh'"), rel + ' 不写 ~/.dsh');
+  check(!text.includes('pi-desktop'), rel + ' 不写 ~/.pi-desktop');
   if (rel === 'node/worker.cjs') {
     check(!text.includes('process.execPath'), rel + ' 不使用 process.execPath');
     check(!text.includes('child_process.fork'), rel + ' 不使用 fork');

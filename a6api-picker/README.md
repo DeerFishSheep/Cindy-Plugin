@@ -1,178 +1,132 @@
 # a6api-picker（Cindy 插件）
 
-把 Pi-Desktop(Cordis) 的 `a6api-dsh-plugin` 转写成 Cindy 插件：右侧栏常驻页签里筛选
-A6API 渠道、按五项评分排名、对比两家、固定/禁用渠道、看余额。核心抓取与评分算法
-原样复用源项目的 `lib/core.mjs`，只把落盘目录从 `~/.dsh` 改成 Cindy 的存储契约。
+把 Pi-Desktop 的 `pi-a6api` 0.3.10（`/Users/lyy/Documents/deepseek-harness/default-workspace/pi-plugin/pi-a6api`，
+本次唯一权威源）移植成 Cindy 插件。面板界面、抓取/评分算法、收藏模型、登录通道全部
+对齐上游；只把「PI 宿主专有」的几处换成 Cindy 契约。
 
 ## 一句话结论
 
-**能转。** 面板、公开榜单、登录态榜单、浏览器 Cookie 同步、令牌、余额、当前固定渠道都已在
-本机实测通过；唯一不能照搬的是「Host 注册 HTTP 端点」这个 DSH 专属形态，已换成 Cindy 的
-`BroadcastChannel + 随包 Node worker`。**没有在 Cindy 里安装运行过**（本次任务禁止安装），
-宿主沙箱内的 `curl` / `security` / `sqlite3` 子进程能力按官方文档属于完整 Node 权限，
-但未在安装后的环境里二次验证——这是最大的剩余风险。
+上游能做的，这个插件都能做：公开榜、登录态榜、两条榜（综合 / 性价比）、全部筛选条件、
+`¥/亿` 成本、收藏（含快照 / 未在榜 / 刷新）、固定、禁用、两家对比、复制榜单、余额、
+品牌与模型列表、三路登录。**没有在 Cindy 里安装运行过**（本次任务禁止安装，`.cindy`
+由用户自己打），宿主侧 `curl` / `sqlite3` / `security` 子进程与保险库注入只在本机
+Node 里按同一协议模拟验证过。
 
-## 能力对照
+## 功能对照（逐条对上游）
 
-| 原能力 | 现状 | 说明 |
+| 上游能力（pi-a6api 0.3.10） | 状态 | 说明 |
 |---|---|---|
-| 拉公开渠道数据（免登录） | ✅ 保留 | worker 里 `curl` + Chrome UA，实测 191 条 / 5s |
-| 五项评分、综合/性价比排序 | ✅ 保留 | `core.mjs` 算法与权重一行未改 |
-| 品牌/模型/令牌筛选 | ✅ 保留 | 面板下拉 + 筛选表单 |
-| 登录态接口（固定状态、令牌、余额） | ✅ 保留 | Cookie 由 Cindy 保险库保管，宿主按方法注入 worker |
-| 从本机 Chrome/Edge/Brave 同步 Cookie | ✅ 实测可用 | 读 Cookies SQLite + 钥匙串解密 + Local Storage 取 userId；实测 `Chrome/Default`、用户 18506、2 个令牌 |
-| 手动粘贴 Cookie + userId | ✅ 保留 | 面板/设置页直接 `PUT /secrets`，不经过对话或 BroadcastChannel |
-| 固定渠道 | ✅ 保留 | 面板里选令牌后固定；**没有**给 AI 开放固定工具 |
-| 禁用渠道 | ✅ 保留 | 面板里两段式确认，防误点 |
-| 查看余额 | ✅ 保留 | `/api/user/self` + `/api/status`，60 秒轮询 |
-| 对比两家渠道 | ✅ 重写 | 原 React 弹层 → 原生 DOM，含 8 项指标与胜负条 |
-| 商家详情（五项拆解） | ✅ 重写 | 原生 DOM 弹层 |
-| 账号密码登录 `/login/password` | ⚠️ 降级 | 源项目有端点但面板没暴露；本插件只保留浏览器同步 + 粘贴 Cookie，未提供密码登录 UI |
-| DSH 的 `/api/dsh-a6api/*` HTTP 端点 | ❌ 不可用 | Cindy 插件没有「注册本地 HTTP 路由」能力，改为 JSON-RPC worker |
-| 输入框旁悬浮按钮 | ❌ 形态不同 | Cindy 侧栏页签（`panel.position: "right"`），宿主负责标题/关闭/最大化 |
-| 数据写 `~/.dsh/*.json` | ❌ 改为宿主契约 | 见下表 |
+| `search` 拉 6 页 × 100 条、并发翻页 | ✅ 已实现 | `node/core.mjs` 原样，worker `search/run` |
+| 筛选：缓存命中 / 成功率 / 倍率 / TTFT / TPS / 样本数 / 仅保真 | ✅ 已实现 | 面板表单与工具参数都齐；`guaranteedOnly` 走保真池 |
+| 两个榜：综合分 + 性价比 | ✅ 已实现 | `ranking` 与 `valueRanking`（`byValue` 乘法模型）都在返回里 |
+| 算钱 `¥x.xx/亿`，按各渠道 24h 缓存命中率拆分 | ✅ 已实现 | `costCnyPer100MInput` / `workloadCost` 未改 |
+| 固定渠道（需登录态） | ✅ 已实现 | `pin/set`，面板行内「固定」+ 已固定 chip |
+| 禁用渠道（两段式确认） | ✅ 已实现 | `disable/channel` |
+| 对比两家渠道（8 项指标、胜负条） | ✅ 已实现 | 面板「对比」弹窗，固定那家默认在左 |
+| 复制榜单 | ✅ 已实现 | 失败时退回 `execCommand`（沙箱 iframe 的 clipboard 可能被拒） |
+| 收藏：行尾 ☆/★、收藏页签、按模型名+渠道 ID 存、快照、未在榜标红、刷新覆盖、切模型重拉 | ✅ 已实现 | `fav/list`、`fav/set`、`fav/refresh`，落 `favorites.json` |
+| 登录：浏览器同步 / 粘贴 Cookie / 账号密码 | ✅ 已实现 | `login/browser`、`login/cookie`、`login/password`；三路都在面板登录弹窗与设置页 |
+| 余额、品牌列表、模型列表 | ✅ 已实现 | `balance/get`、`brands/list`、`models/list` |
+| 面板顶栏状态（圆点/余额/登录）、错误提示、loading | ✅ 已实现 | 与上游标记一致；圆点用 `status/get` 补了一次可达性探测 |
+| `a6api.reveal`（悬浮球唤出侧栏） | ⚠️ 形态不同 | Cindy 没有桌面悬浮球，面板由宿主页签承载，插件没有「唤起自己面板」的 API；命令 `$渠道` 即入口 |
+| `widget.html` 桌面悬浮球 | ❌ 不移植 | PI 专有形态。Cindy 用 `panel.position: "right"` 的右侧栏页签 + `$渠道` 命令 |
+| 数据写 `~/.pi-desktop/...`、`~/.dsh/...` | ❌ 改为宿主契约 | 见「数据落盘」 |
+
+## API 对照（上游 `a6api.*` → 本插件 RPC → 实现位置）
+
+| 上游通道 | 本插件 RPC | 谁实现 |
+|---|---|---|
+| `a6api.search` | `search/run` | worker（core.collect + slim + valueRanking），main 写 `last.json` |
+| `a6api.balance` | `balance/get` | worker |
+| `a6api.brands` | `brands/list` | worker |
+| `a6api.models` | `models/list` | worker |
+| `a6api.last` | `last/get` | main（`fs root:'data'` 的 `last.json`，带算法版本校验） |
+| `a6api.session` | `session/get` | main（`/kv`；带 `tokenId` 时写回） |
+| `a6api.login` | `login/browser` | worker `session/import` + main 保险库/`/kv`；失败开登录页并每 2 秒重试，最多 5 分钟 |
+| `a6api.login.cookie` | `login/cookie` | worker 验证（注入的 Cookie）+ main 写 `userId` |
+| `a6api.login.password` | `login/password` | worker `core.loginWithPassword` + main 存 Cookie 到保险库 |
+| `a6api.logout` | `logout` | main（清保险库 + `/kv`） |
+| `a6api.tokens` | `tokens/list` | worker + main 选默认令牌 |
+| `a6api.pin.current` | `pin/current` | worker |
+| `a6api.pin` | `pin/set` | worker |
+| `a6api.disable` | `disable/channel` | worker |
+| `a6api.status` | `status/get` | worker 探测可达性 + main 合并登录态 |
+| `a6api.reveal` | — | 不适用：Cindy 无悬浮球，面板唤起由宿主/`$渠道` 负责 |
+| `a6api.fav.list` | `fav/list` | main（`favorites.json`） |
+| `a6api.fav.set` | `fav/set` | main |
+| `a6api.fav.refresh` | `fav/refresh` | main |
+
+> 收藏为什么不在 worker：Cindy 里只有 main.js（浏览器沙箱）能写 `fs root:'data'`，
+> worker 拿不到任何宿主磁盘路径。把它留在 main 是唯一能持久化的位置；算法与上游
+> `main.js` 的 `favList/favSet/favRefresh` 逐行对应。
+
+## 数据落盘（不写 `~/.dsh` / `~/.pi-desktop`）
+
+| 数据 | 位置 | 说明 |
+|---|---|---|
+| Cookie | Cindy 保险库（`node.secretBindings.a6api_cookie`） | 只写；`/secrets` 回查最多看到尾 4 位。按方法临时注入 worker |
+| userId / tokenId / 筛选条件 | 插件 `/kv` | 非敏感配置，重开面板/重装不丢 |
+| 上次榜单 `last.json`、收藏 `favorites.json` | `fs root:'data'` | 插件私有数据目录；卸载时宿主回收 |
+| Chrome Cookies 临时拷贝、cookie jar、模型列表缓存 | 系统临时目录 `a6api-picker-cindy-<uid>/` | `core.mjs` 只改了这一处落盘路径（走 `A6API_DATA_DIR` / `setDataDir()`） |
+
+`core.mjs` 与上游唯一差异：`DATA_DIR` 默认从 `~/.dsh` 改成 `A6API_DATA_DIR` 或系统临时
+目录。抓取、评分、筛选、`byValue`、登录解析逐行未改。
 
 ## 架构
 
 ```
-panel.html / panel.js ──┐
-settings.html/js ───────┴─ BroadcastChannel('a6api-picker') ─→ main.js（电子脑）
-                                                                  │ cindy.node.request
-                                                                  ▼
-                                                        node/worker.cjs（完整 Node 权限）
-                                                                  │ child_process: curl
-                                                                  ▼
-                                                            a6api.com
+panel.html/panel.js ─┐
+settings.html/js ────┴─ BroadcastChannel('a6api-picker') ─→ main.js（电子脑）
+                                                              │ cindy.node.request
+                                                              ▼
+                                                     node/worker.cjs（完整 Node 权限）
+                                                              │ child_process: curl
+                                                              ▼
+                                                         a6api.com
 ```
 
-- 面板和设置页都在 Cindy 沙箱里，不能直连网络；所有请求经 `main.js` 转给随包 worker。
-- 面板打开时先 `fetch('cindy-ghost://a6api-picker/wake')` 叫醒电子脑，再按 `reqId` 每 700ms 重发，
-  直到收到 `rpc-reply`。电子脑按 `reqId` 去重并回放 120 秒内的结果。
-- Cookie 不经过面板广播：面板/设置页直接 `PUT /secrets/a6api_cookie`；worker 收到的
-  `request.cindy.secrets.a6api_cookie` 由宿主动态注入。浏览器同步是唯一例外：worker 读到的
-  Cookie 经 `main.js` 直接写入保险库，不回面板。
+- 面板打开时先 `fetch('cindy-ghost://a6api-picker/wake')` 叫醒电子脑，再按 `reqId` 每 700ms
+  重发，直到收到 `rpc-reply`；main 按 `reqId` 去重并回放 120 秒内的结果。
+- Cookie 明文不进 BroadcastChannel：面板/设置页直接 `PUT /secrets`，worker 用
+  `request.cindy.secrets.a6api_cookie`；浏览器同步是唯一例外（worker → main → 保险库）。
+- 账号密码只经 BroadcastChannel → main → worker 这一次，不落盘、不进 `/kv`、不写日志。
 
-## 数据落盘（不写 `~/.dsh`）
-
-| 数据 | 位置 | 说明 |
-|---|---|---|
-| Cookie | Cindy 保险库（`node.secretBindings.a6api_cookie`） | 只写；`/secrets` 回查最多看到尾 4 位 |
-| userId、令牌选择、筛选条件 | 插件 `/kv` | 非敏感配置 |
-| 上次榜单快照 | `fs root:'data'` 的 `last.json` | 重开面板立即恢复 |
-| Chrome Cookies 临时拷贝、模型列表缓存 | 系统临时目录 `cindy-a6api-picker-<uid>/` | `core.mjs` 支持 `A6API_DATA_DIR`；卸载/重启可丢 |
-
-`core.mjs` 与源项目的差异只有 4 处（`diff` 共 35 行）：`CRED_DIR`/`CRED_FILE`、Cookies 临时文件、
-模型缓存路径改读 `A6API_DATA_DIR`，以及为临时目录补一次 `mkdirSync`。抓取、评分、筛选、
-登录解析等算法未改。
-
-## 实测证据
-
-### 1）worker 直连（公开 + 登录态）
+## 本地复现
 
 ```sh
-node dev/probe-worker.mjs
-```
-
-真实输出的关键片段（Cookie 已脱敏）：
-
-```
-## 1. 无登录态拉公开数据
-{ "ok": true, "total": 191, "fetched": 191, "kept": 9, "scope": "public", ... }
-
-## 3. 用宿主注入的 Cookie 走登录态接口
-{ "ok": true, "total": 187, "fetched": 187, "kept": 9, "scope": "auth", "loggedIn": true, ... }
-
-## 4. 余额（只读）
-{ "ok": true, "balance": { "cny": 34.62, "usd": 4.7418, "quota": 2370924, ... } }
-
-## 2. 从本机浏览器同步登录态
-{ "ok": true, "cookie": "<redacted 678 chars>", "userId": 18506,
-  "source": "Chrome/Default", "tokenCount": 2, ... }
-
-耗时 15.3s
-```
-
-### 2）面板渲染（用上面真实抓取的数据）
-
-```sh
-node dev/capture.mjs
-# 生成 dev/sample.js（真实数据）与 dev/preview.html（由 panel.html 自动生成）
-python3 -m http.server 8799 --bind 127.0.0.1
-# 只走公开数据（未登录）主链路：
+cd a6api-picker
+node dev/validate.mjs        # manifest / 页面 / 红线的静态自检
+node dev/probe-main.mjs      # 真 main.js + 真 worker + 真 curl，跑全部只读接口与收藏闭环
+node dev/capture.mjs         # 抓真实数据生成 dev/preview.html（gitignore）
+# 面板渲染（headless Chrome）
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
-  --disable-gpu --no-sandbox --window-size=460,1000 --virtual-time-budget=6000 \
-  --dump-dom "http://127.0.0.1:8799/dev/preview.html?mode=public"
+  --virtual-time-budget=6000 --dump-dom "file://$PWD/dev/preview.html?tab=fav"
+python3 dev/pack.py          # 生成 .cindy（不打也行，用户自己打）
 ```
 
-DOM 里实际出现（公开模式）：
+`dev/probe-main.mjs` 用假宿主把 main.js 跑在 Node 里：`/kv`、`/secrets`、`fs root:'data'`
+和按 `secretBindings` 注入 Cookie 都在内存/临时目录里模拟，网络与解析走真实 worker，
+所以主流程是真实数据。输出见 `dev/probe-main.mjs` 的运行结果。
 
-```
-未登录 · 公开数据
-综合排名 · 共 9 条 · 接口 191 / 达标 9 · 未登录
-class="row-item" × 9
-| 1 | 78.6 | #234 | Supplier ID 77 | …
-| 2 | 77.4 | #678 | Supplier ID 77 | …
-| 3 | 73.4 | #4676 | Supplier ID 996 | …
-```
+## 未实跑项（如实说明）
 
-登录模式同样跑过：`已登录 · 用户 18506`、`余额 ¥34.60`、`综合排名 · 共 9 条 · 接口 187 / 达标 9`。
-截图见 `dev/screenshots/public-none.png`（公开榜单）、`public-detail.png`（评分拆解）、
-`public-compare.png`（两家对比）。这三张都是**未登录公开数据**，不含账号信息；
-本地预览图只是验证渲染，不是宿主安装后的截图。
+| 项 | 原因 |
+|---|---|
+| `pin/set` 固定渠道 | 会改账号真实路由（写操作），本次只验证只读的 `pin/current` |
+| `disable/channel` 禁用渠道 | 上游标注「不可撤销」，不拿真实账号试 |
+| `login/password` 账号密码登录 | 需要真实密码；代码路径与 `login/cookie` 共用 `identify()` + 保险库写入 |
+| 浏览器登录自动重试（打开登录页那一路） | 本机浏览器已有登录态，同步分支直接成功；开页/轮询分支未触发 |
+| 宿主内实际安装运行 | 任务明确禁止安装；`.cindy` 由用户打 |
 
-截图确认了点：登录状态/余额、筛选表单、9 条榜单、固定/禁用/详细/对比、当前固定渠道与令牌下拉；
-暗色变量下同样可读（本地用 `?theme=dark` 模拟）。`dev/` 只是本地验证工具，不进 `.cindy`。
+## 风险
 
-## 打包与安装
-
-本环境没有 `ghost_forge_pack` 工具（pi worker 只提供文件/命令工具），所以 `.cindy` 由
-`dev/pack.py` 按官方包结构（zip 根目录放 `ghost.json`）生成，并用 `dev/validate.mjs`
-逐条核对文档里的硬约束。**这不是 Forge 校验过的包**，装之前宿主还会做一次真实校验；
-如果宿主拒装，把错误码发回来即可按提示修 manifest。
-
-```sh
-node dev/validate.mjs
-python3 dev/pack.py
-# 产物：a6api-picker/a6api-picker-1.0.0.cindy
-```
-
-装法：Cindy → 插件页 → 导入本地 `.cindy`，或把文件拖进 Cindy 窗口；首次安装会列出权限
-（Node 本机权限、私有数据目录、一个 A6API Cookie 凭证），确认后启用。启用后在任意对话的
-右侧栏「+」里打开「A6API 渠道」页签。也可以 `$渠道` 点名。
-
-## 权限与风险
-
-- 声明 `node`：worker 是完整 Node 进程，能读写当前用户文件、起子进程（`curl` / `security` /
-  `sqlite3`）、联网。这是绕开 a6api CDN TLS 指纹与读取本机浏览器登录态的必要代价。
-- 声明 `fs: true`：只用于 `root:'data'` 的榜单快照。
-- 声明 `node.secretBindings.a6api_cookie`：明文只在本插件的 worker 内存里出现；不会进
-  `/kv`、BroadcastChannel、日志或面板。worker 用完不缓存。
-- 自动同步需要 macOS 允许访问 `Chrome Safe Storage` 钥匙串项；第一次可能弹窗。拒绝、浏览器
-  加密方式变化、或只登录在 Cindy 内嵌浏览器里时，自动同步会失败，改用手动粘贴 Cookie。
-  自动同步路径是 macOS 专用的（Chrome/Edge/Brave 目录 + `security` + `sqlite3`）；Windows/Linux
-  未实现，只能手动粘贴 Cookie。
-- 禁用渠道在站点侧不可撤销；面板用两段式确认，但仍建议只对确认不用的渠道操作。
-- 固定/禁用依赖当前登录用户与令牌；切账号后需要重新同步。
-
-## 目录
-
-```
-a6api-picker/
-├── ghost.json            # v3 身份卡：panel(position:right)、node、fs、secretBindings、tool
-├── main.js               # 电子脑：BroadcastChannel ↔ worker、保险库、/kv、fs data
-├── bridge.js             # 面板/设置页共用的小桥（wake + reqId 重发）
-├── panel.html/css/js     # 右侧栏面板（原生 DOM）
-├── settings.html/css/js  # 登录态管理（同步/粘贴/清除）
-├── node/worker.cjs       # JSON-RPC stdio worker
-├── node/core.mjs         # 源项目 core.mjs（仅落盘路径改动）
-├── assets/icon.png
-├── dev/                  # 本地实测/预览/静态校验/打包，不进 .cindy
-└── README.md
-```
-
-## 与源项目的关系
-
-- 源项目：`/Users/lyy/Documents/deepseek-harness/default-workspace/a6api-dsh-plugin`（只读）。
-- 算法与业务事实（CDN 掐 TLS 指纹、必须 Chrome UA、公开接口无固定状态、`new-api-user` 头、
-  1 亿成本口径、五项权重）全部沿用源 README 与 `core.mjs`。
-- 本仓库只做了宿主形态转写，没有修改源项目任何文件。
+1. **未在 Cindy 宿主内跑过**：`cindy.node.request`、`/secrets` 注入、`fs root:'data'` 的
+   行为按官方文档与旧版插件实现，dev 脚本用同签名模拟；真实宿主若有细节差异（例如
+   fs 响应结构），最先受影响的是收藏/快照。
+2. **worker 需要本机 `curl` / `sqlite3` / `security`**：这是上游 design（Node fetch 会被
+   CDN 按 TLS 指纹掐断），Cindy 的 Node 工作进程是完整本机权限，按文档可用。
+3. **账号密码登录**把密码交给本地 worker 一次；只发往 a6api.com 的 `/api/user/login`，
+   不落盘，但仍属于「凭据经过插件代码」。
+4. **`login/cookie` 的用户 ID**：站点现在要求 `new-api-user` 头，纯 Cookie 调
+   `/api/user/self` 会 401。worker 改成先解 session cookie 里的 ID，再用拉令牌列表验证；
+   上游 `fetchUserId` 那条老路只在解不出 ID 时兜底。
