@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>A6API 登录</h1>
+      <p class="sub">固定渠道、禁用渠道、看余额需要 a6api.com 登录态；只看公开榜单不用登录。</p>
+    </div>
+    <span id="dot" class="dot"></span>
+  </div>
+
+  <div id="status" class="status">正在检查…</div>
+
+  <div class="row">
+    <button id="syncBtn" class="btn" type="button">同步浏览器登录</button>
+    <button id="toggleBtn" class="btn ghost" type="button">手动粘贴 Cookie</button>
+  </div>
+
+  <div id="paste" class="paste" hidden>
+    <label class="label" for="cookie">a6api.com Cookie</label>
+    <textarea id="cookie" rows="3" placeholder="开发者工具 → Network → 任意请求 → 请求头 Cookie，整串粘贴"></textarea>
+    <div class="row">
+      <label class="label grow" for="userId">用户 ID（可留空自动解析）</label>
+      <input id="userId" class="input" inputmode="numeric" placeholder="例如 18506">
+    </div>
+    <button id="saveBtn" class="btn primary" type="button">保存并验证</button>
+    <p class="hint">Cookie 直接写入 Cindy 保险库，面板和 AI 都读不回明文。插件只在调用 a6api 时由宿主临时注入给随包 Node 进程。</p>
+  </div>
+
+  <div class="row">
+    <button id="clearBtn" class="link danger" type="button">清除已保存的 Cookie</button>
+    <a class="link" href="https://a6api.com/" rel="noreferrer">打开 a6api.com ↗</a>
+  </div>
+
+  <p id="msg" class="msg"></p>
+
+  <div class="note">
+    <p><b>自动同步怎么工作：</b>随包 Node 进程读取本机 Chrome / Edge / Brave 的 Cookies 数据库，用 macOS 钥匙串里的 Chrome Safe Storage 解密 a6api 的 Cookie，再从浏览器 Local Storage 读用户 ID。第一次读取时 macOS 可能询问是否允许访问钥匙串，拒绝或读不到就用上面的手动粘贴。</p>
+    <p><b>降级说明：</b>如果 Chrome 正在运行且数据库被锁，复制用的是临时快照，通常仍可读；如果浏览器用了新的加密方式、或你只登录在 Cindy 内嵌浏览器里，自动同步会失败——手动粘贴 Cookie 始终可用。</p>
+    <p><b>数据存放：</b>Cookie 在 Cindy 保险库；用户 ID、令牌选择和筛选条件在插件 <code>/kv</code>；榜单快照在插件数据目录。插件不写 <code>~/.dsh</code>。</p>
+  </div>
+</div>
+<script src="bridge.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>

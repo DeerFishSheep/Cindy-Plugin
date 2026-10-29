@@ -1,0 +1,4 @@
+.DS_Store
+# 这些是本地实测生成的（含账号信息 / 真实抓取快照），不进仓库。
+a6api-picker/dev/sample.js
+a6api-picker/dev/preview.html

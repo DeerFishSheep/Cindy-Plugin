@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 3,
+  "id": "a6api-picker",
+  "name": "A6API 渠道筛选",
+  "description": "在右侧栏打开 A6API 渠道面板：按模型/品牌/令牌筛选，按有效率、价格、稳定性、首字、吞吐五项打分排名，对比两家渠道，一键固定或禁用渠道，并查看账号余额。登录可复用本机 Chrome 里已有的 a6api.com 登录态。",
+  "whenToUse": "需要筛选、评分、对比 A6API 商家渠道，查看渠道首字/吞吐/成功率/缓存命中率，固定或禁用某个渠道，查 A6API 余额时找我；也可以直接在对话里让 AI 拉一份渠道榜单。",
+  "version": "1.0.0",
+  "minCindyVersion": "0.1.119",
+  "entry": "main.js",
+  "icon": "assets/icon.png",
+  "command": "渠道",
+  "panel": {
+    "title": "A6API 渠道",
+    "html": "panel.html",
+    "position": "right"
+  },
+  "settingsHtml": "settings.html",
+  "fs": true,
+  "tools": [
+    {
+      "name": "a6api_channel_search",
+      "description": "拉取 A6API 的渠道榜单并返回文字摘要。按模型筛选渠道，用固定工作量（1000 万输入 + 2.5 万输出）算成本，按有效率/价格/稳定性/首字/吞吐五项各 20% 打分。用户问“哪个 A6API 渠道好/便宜/快”、要对比商家、或想固定渠道时用。需要固定/禁用渠道请让用户在右侧栏面板里操作。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "模型名，例如 deepseek-v4.1-flash。用户没点名时先问，或先用 deepseek-v4.1-flash。"
+          },
+          "brand": {
+            "type": "string",
+            "description": "品牌过滤，例如 DeepSeek、OpenAI。可选。"
+          },
+          "minCache": {
+            "type": "number",
+            "description": "24 小时缓存命中率下限，百分比，例如 80。可选。"
+          },
+          "minSr": {
+            "type": "number",
+            "description": "成功率下限，百分比，例如 95。可选。"
+          },
+          "maxRatio": {
+            "type": "number",
+            "description": "倍率上限，例如 0.1。可选。"
+          },
+          "maxTtft": {
+            "type": "number",
+            "description": "首字延迟上限，秒，例如 5。可选。"
+          },
+          "minTps": {
+            "type": "number",
+            "description": "吞吐下限，tok/s。可选。"
+          },
+          "minSample": {
+            "type": "number",
+            "description": "样本数下限。可选。"
+          },
+          "limit": {
+            "type": "number",
+            "description": "返回多少条，默认 10，最多 30。"
+          }
+        },
+        "required": ["model"]
+      }
+    }
+  ],
+  "node": {
+    "entry": "node/worker.cjs",
+    "protocol": "json-rpc-stdio",
+    "lifecycle": "on-demand",
+    "idleTimeoutSeconds": 300,
+    "secretBindings": [
+      {
+        "key": "a6api_cookie",
+        "label": "A6API Cookie",
+        "hint": "在浏览器登录 a6api.com 后，从开发者工具任意请求头复制整串 Cookie；也可以点面板里的“同步浏览器登录”自动读取。",
+        "url": "https://a6api.com/",
+        "methods": [
+          "search/run",
+          "models/list",
+          "brands/list",
+          "session/probe",
+          "tokens/list",
+          "pin/current",
+          "pin/set",
+          "disable/channel",
+          "balance/get"
+        ]
+      }
+    ]
+  }
+}
