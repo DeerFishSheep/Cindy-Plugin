@@ -3,9 +3,7 @@
 按 `pi-plugin/pi-a6api` **0.3.10**（10/27，唯一权威源）把 A6API 渠道筛选移植成 Cindy
 插件。源码在 [`a6api-picker/`](a6api-picker/)，`.cindy` 由用户自己打。
 
-旧版（对着 10/18 的 `a6api-dsh-plugin` 转的那份）已整体作废：榜单只有一份、没有收藏、
-筛选条件缺一半、账号密码登录被砍掉。现在这份是重写版，逐项对齐上游 README 与
-`views/index.html`。
+逐项对齐上游 README 与 `views/index.html`。
 
 ## 状态
 
