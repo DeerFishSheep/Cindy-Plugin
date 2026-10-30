@@ -82,7 +82,7 @@ settings.html/js ────┴─ BroadcastChannel('a6api-picker') ─→ main
                                                      node/worker.cjs（完整 Node 权限）
                                                               │ child_process: curl
                                                               ▼
-                                                         a6api.com
+                                                        a6api.vip
 ```
 
 - 面板打开时先 `fetch('cindy-ghost://a6api-picker/wake')` 叫醒电子脑，再按 `reqId` 每 700ms
@@ -125,7 +125,7 @@ python3 dev/pack.py          # 生成 .cindy（不打也行，用户自己打）
    fs 响应结构），最先受影响的是收藏/快照。
 2. **worker 需要本机 `curl` / `sqlite3` / `security`**：这是上游 design（Node fetch 会被
    CDN 按 TLS 指纹掐断），Cindy 的 Node 工作进程是完整本机权限，按文档可用。
-3. **账号密码登录**把密码交给本地 worker 一次；只发往 a6api.com 的 `/api/user/login`，
+3. **账号密码登录**把密码交给本地 worker 一次；只发往 a6api.vip 的 `/api/user/login`，
    不落盘，但仍属于「凭据经过插件代码」。
 4. **`login/cookie` 的用户 ID**：站点现在要求 `new-api-user` 头，纯 Cookie 调
    `/api/user/self` 会 401。worker 改成先解 session cookie 里的 ID，再用拉令牌列表验证；

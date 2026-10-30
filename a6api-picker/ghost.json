@@ -4,8 +4,8 @@
   "name": "A6API 渠道筛选",
   "description": "在右侧栏挑 A6API 上游渠道：按品牌/模型/缓存/成功率/倍率/首字/吞吐/样本数筛选，出综合分榜与性价比榜，把单位成本算成 ¥/亿（按各渠道 24h 缓存命中率拆分）；可收藏渠道并刷新快照、对比两家、复制榜单，登录后固定或禁用渠道、看余额与令牌。登录支持浏览器同步、粘贴 Cookie、账号密码三路。",
   "whenToUse": "需要筛选、评分、对比 A6API 商家渠道，看渠道首字/吞吐/成功率/缓存命中率/单位成本，收藏常用渠道，固定或禁用某个渠道，查 A6API 余额时找我；也可以直接在对话里让 AI 拉一份综合榜与性价比榜。",
-  "version": "1.1.2",
-  "releaseNotes": "1.1.2：修复筛选条件保存失败（面板通道表缺 filters/get、filters/save，报「未知通道」）；1.1.1 起筛选条件改为存插件数据目录 ghost-fs data/filters.json，改完即时保存、重开面板自动回填。",
+  "version": "1.1.3",
+  "releaseNotes": "1.1.3：a6api.com 已被 CDN 换成跳转页（请求接口只回 HTML，报 Unexpected token '<'），域名整体切到 a6api.vip；接口再返回网页时给出可读错误。1.1.2：修复筛选条件保存失败（面板通道表缺 filters/get、filters/save，报「未知通道」）；1.1.1 起筛选条件改为存插件数据目录 ghost-fs data/filters.json，改完即时保存、重开面板自动回填。",
   "minCindyVersion": "0.1.119",
   "entry": "main.js",
   "icon": "assets/icon.png",
@@ -84,8 +84,8 @@
       {
         "key": "a6api_cookie",
         "label": "A6API Cookie",
-        "hint": "在浏览器登录 a6api.com 后，从开发者工具任意请求头复制整串 Cookie；也可以点面板里的“同步浏览器登录”，或用设置页的账号密码登录。",
-        "url": "https://a6api.com/",
+        "hint": "在浏览器登录 a6api.vip 后，从开发者工具任意请求头复制整串 Cookie；也可以点面板里的“同步浏览器登录”，或用设置页的账号密码登录。",
+        "url": "https://a6api.vip/",
         "methods": [
           "search/run",
           "models/list",

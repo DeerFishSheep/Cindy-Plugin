@@ -1,7 +1,7 @@
 // Cindy 电子脑：面板/设置页 ↔ 随包 Node worker 的桥。
 //
 // 链路：panel.html / settings.html --BroadcastChannel--> main.js
-//       main.js --cindy.node.request--> node/worker.cjs --curl--> a6api.com
+//       main.js --cindy.node.request--> node/worker.cjs --curl--> a6api.vip
 //
 // 上游 pi-a6api 0.3.10 的 main.js 把凭据落在插件数据目录（a6api-session.json），
 // Cindy 里没有「插件自己拿一个磁盘路径」这回事，所以持久化拆成三处：
@@ -637,7 +637,7 @@ async function handleToolCall(msg) {
       errorCode: 'A6API_FAILED',
       message:
         (result.error || '拉取 A6API 渠道失败') +
-        '。可以在右侧栏「A6API 渠道」面板里点「刷新」重试；如果一直失败，检查网络或代理是否能访问 a6api.com。'
+        '。可以在右侧栏「A6API 渠道」面板里点「刷新」重试；如果一直失败，检查网络或代理是否能访问 a6api.vip。'
     });
     return;
   }

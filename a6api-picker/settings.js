@@ -72,7 +72,7 @@
     } catch (err) {
       setMsg(
         '同步失败：' + String((err && err.message) || err) +
-          '。请在浏览器登录 a6api.com 后重试，或用「手动粘贴 Cookie」/「账号密码登录」。',
+          '。请在浏览器登录 a6api.vip 后重试，或用「手动粘贴 Cookie」/「账号密码登录」。',
         'err'
       );
     } finally {

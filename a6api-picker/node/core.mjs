@@ -6,7 +6,9 @@ import { promisify } from 'node:util';
 
 const pexec = promisify(execFile);
 
-export const BASE = 'https://a6api.com';
+// 2026-10-30：a6api.com 被 CDN 全站换成了跳转页（返回 HTML 把人送去 a6api.vip），
+// 所有接口都在 a6api.vip 上，域名再换时只改这一行。
+export const BASE = 'https://a6api.vip';
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36';
@@ -121,13 +123,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function explain(err) {
   const text = String((err && (err.stderr || err.message)) || err);
   if (/SSL_ERROR_SYSCALL|ECONNRESET|SSL_connect|socket hang up/i.test(text)) {
-    return '连不上 a6api.com（TLS 握手被重置）。检查代理是否稳定，或多试一次。';
+    return '连不上 a6api.vip（TLS 握手被重置）。检查代理是否稳定，或多试一次。';
   }
   if (/timed out|Operation timed out|code: 28/i.test(text)) {
-    return '连接 a6api.com 超时（30 秒）。检查网络或代理。';
+    return '连接 a6api.vip 超时（30 秒）。检查网络或代理。';
   }
-  if (/Could not resolve host/i.test(text)) return '解析不了 a6api.com，检查 DNS 或代理。';
-  return '请求 a6api.com 失败：' + text.split('\n')[0].slice(0, 160);
+  if (/Could not resolve host/i.test(text)) return '解析不了 a6api.vip，检查 DNS 或代理。';
+  return '请求 a6api.vip 失败：' + text.split('\n')[0].slice(0, 160);
 }
 
 async function requestOnce(method, url, hdrs, body) {
@@ -147,7 +149,12 @@ async function requestOnce(method, url, hdrs, body) {
     status,
     ok: status >= 200 && status < 300,
     text: () => Promise.resolve(text),
-    json: () => Promise.resolve(JSON.parse(text || '{}'))
+    json: () => {
+      // 域名被 CDN 换掉时服务器会回一个 200 的跳转网页，直接 JSON.parse 只会抛
+      // "Unexpected token '<'"，这里换成能看懂的话。
+      if (/^\s*</.test(text)) throw new Error(url.host + ' 返回的是网页而不是 JSON（域名可能已更换或被 CDN 拦截）');
+      return Promise.resolve(JSON.parse(text || '{}'));
+    }
   };
 }
 
@@ -692,7 +699,7 @@ function decryptValue(buf, key, host) {
  * 直接读本机 Chrome 的 Cookies 数据库，拿 a6api 的登录态。
  * 用户不用手抄 cookie —— 浏览器里登录过就够了。
  */
-export function importBrowserCookie(host = 'a6api.com') {
+export function importBrowserCookie(host = 'a6api.vip') {
   let key = null;
   const errors = [];
 
@@ -742,7 +749,7 @@ export function importBrowserCookie(host = 'a6api.com') {
 
   throw new Error(
     '没在浏览器里找到 a6api 的登录状态' + (errors.length ? '（' + errors[0] + '）' : '') +
-    '：请先在浏览器登录 a6api.com'
+    '：请先在浏览器登录 a6api.vip'
   );
 }
 

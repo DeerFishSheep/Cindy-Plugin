@@ -215,9 +215,9 @@ const handlers = {
     const c = await core();
     const info = c.importBrowserCookie();
     const userId = c.resolveUserId(info.cookie);
-    if (!userId) throw new Error('浏览器里的 a6api 登录态里没有用户 ID，请在该浏览器打开一次 a6api.com 再试');
+    if (!userId) throw new Error('浏览器里的 a6api 登录态里没有用户 ID，请在该浏览器打开一次 a6api.vip 再试');
     const tokens = await c.listTokens({ cookie: info.cookie, userId });
-    if (!tokens.length) throw new Error('浏览器里的 a6api 登录态已失效，请重新登录 a6api.com');
+    if (!tokens.length) throw new Error('浏览器里的 a6api 登录态已失效，请重新登录 a6api.vip');
     return {
       ok: true,
       cookie: info.cookie,
@@ -255,7 +255,7 @@ const handlers = {
 
   /** 同步失败时打开站点登录页（用户登录完，main.js 每 2 秒重试同步）。 */
   async 'login/open-page'() {
-    const url = 'https://a6api.com/login';
+    const url = 'https://a6api.vip/login';
     await new Promise((resolve) => {
       try {
         execFile('open', [url], () => resolve());
