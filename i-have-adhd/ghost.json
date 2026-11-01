@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 3,
+  "id": "i-have-adhd",
+  "name": "ADHD 输出",
+  "description": "让每一轮会话默认输出 ADHD 友好的结构：第一行先给下一步动作，多步工作用编号清单，每条回复结尾给一个两分钟内能做完的动作，清单不超过 5 条，不复述身份和拓扑，时间估计只用分钟或小时。规则写进 ~/.pi/agent/AGENTS.md 的受管段，对所有会话全局生效，关闭时逐字节还原你原来的文件。规则改编自 ayghri/i-have-adhd 与 NecromanAlbert/dsh-i-have-adhd（均为 MIT）。",
+  "whenToUse": "用户想要 ADHD 友好的输出格式、要求回答更短更直接、抱怨回复太长或铺垫太多、要求先给下一步动作或编号步骤时找我；也可用来查看或开关当前 ADHD 输出模式。",
+  "version": "1.0.0",
+  "releaseNotes": "首个版本：把 ADHD 输出规则托管到全局上下文文件，插件启用即对所有会话生效，设置页可随时开关，关闭时逐字节还原原文。",
+  "minCindyVersion": "0.1.120",
+  "kind": "chip",
+  "entry": "main.js",
+  "icon": "assets/icon.png",
+  "command": "adhd",
+  "launch": "resident",
+  "fs": true,
+  "settingsHtml": "settings.html",
+  "settingsHeight": 300,
+  "showTaskPreferences": false,
+  "tools": [
+    {
+      "name": "adhd_status",
+      "description": "查看 ADHD 输出模式当前是否生效、规则写到了哪个全局上下文文件、占多少字节。用户问“ADHD 模式开着吗”“这个规则现在生效没有”时用。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "adhd_toggle",
+      "description": "打开或关闭 ADHD 输出模式。打开时把规则写进全局上下文文件（对所有会话生效），关闭时把受管段抽走并逐字节还原用户原文件。用户说“关掉 ADHD 模式”“恢复正常输出”“把 adhd 打开”时用。",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "true 打开，false 关闭。"
+          }
+        },
+        "required": ["enabled"]
+      }
+    }
+  ],
+  "node": {
+    "entry": "node/worker.cjs",
+    "protocol": "json-rpc-stdio",
+    "lifecycle": "on-demand"
+  }
+}
