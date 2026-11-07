@@ -5,8 +5,15 @@
 ## 为什么不是官方 API
 
 Cindy 0.1.126 的 `cindy.companions.*` 只有查看和回答，没有 Soul / 记忆读写；
-手册写明「不能改伙伴设置」。但 Node 工作进程有完整本机文件权限，伙伴数据就是
-本地文件，所以这个插件直接读写文件。
+手册写明「不能改伙伴设置」。但 Node 工作进程有完整本机文件权限，所以这个插件直接
+读写本地文件和本地数据库。
+
+**人设生效的位置是数据库，不是 `SOUL.md`。** 运行时拼人设读的是
+`bot_profile_versions.identity_source`（当前版本由 `bot_profiles.current_version` 指定）；
+`SOUL.md` 只是它的镜像，宿主只在给伙伴建主任务那一刻才把文件回读进库，
+而设置页保存时又是反过来用库覆盖文件。所以只改文件不会生效。
+同步 Soul 时插件写两处：先覆盖 `SOUL.md`，再往 `bot_profile_versions` 插一条新版本
+并抬 `current_version`（旧版本行保留，回退就是把版本指回去）。
 
 ```
 ~/Library/Application Support/Cindy/owners/<owner>/bots/<botId>/
@@ -24,7 +31,8 @@ Cindy 0.1.126 的 `cindy.companions.*` 只有查看和回答，没有 Soul / 记
 ## 功能
 
 - **伙伴列表**：扫 `bots/*`，名字取自主库 `bot_profiles.display_name`
-- **Soul**：预览源 Soul，整份覆盖目标；覆盖前自动备份为 `SOUL.md.bak-<时间戳>`
+- **Soul**：预览源 Soul，整份覆盖目标；覆盖前自动备份为 `SOUL.md.bak-<时间戳>`，
+  同时插入人设版本并抬 `current_version`，下一轮对话生效
 - **记忆**：逐条勾选，追加到目标；正文完全相同的自动跳过
 - **备份**：面板里可查看并恢复目标伙伴的历史 Soul
 
@@ -50,6 +58,6 @@ partner-sync/
 
 ## 注意
 
-- 直接改文件依赖 Cindy 的本地存储布局；Cindy 大版本升级后若路径变了，`worker.cjs`
-  顶部的 `APP_DIR` 需要跟着改。
-- 正在运行的伙伴不会热加载新 Soul，下一次任务/会话才生效。
+- 直接改文件、直接写库都依赖 Cindy 的本地存储布局；Cindy 大版本升级后若路径或
+  表结构变了，`worker.cjs` 顶部的 `APP_DIR` 和 `bumpIdentityVersion()` 里的 SQL 需要跟着改。
+- 正在跑的伙伴不会热加载新 Soul，下一轮对话（或下一次任务）才用新人设。

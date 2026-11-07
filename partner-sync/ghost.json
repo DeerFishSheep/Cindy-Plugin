@@ -4,7 +4,7 @@
   "name": "伙伴同步",
   "description": "在右侧栏列出所有伙伴，查看某个伙伴的 Soul 和逐条记忆，把选中的 Soul 或记忆同步到另一个伙伴。Soul 覆盖前自动备份，记忆追加并按正文去重，源伙伴内容不动。",
   "whenToUse": "需要把某个伙伴的 Soul 或记忆复制到另一个伙伴、对比各伙伴的人设、迁移或备份记忆时找我",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minCindyVersion": "0.1.120",
   "entry": "main.js",
   "icon": "assets/icon.png",

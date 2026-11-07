@@ -428,7 +428,7 @@ $('syncSoul').onclick = function () {
   updateButtons();
   setMsg('同步中…');
   call('sync/soul', { srcId: srcId, dstId: dstId }).then(function (r) {
-    setMsg('Soul 已同步，原文件备份为 ' + r.backup, 'ok');
+    setMsg('Soul 已同步，人设版本 v' + r.version + '，原文件备份为 ' + r.backup, 'ok');
   }).catch(function (e) {
     setMsg(String(e.message || e), 'err');
   }).then(function () {

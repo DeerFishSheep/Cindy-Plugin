@@ -253,6 +253,61 @@ function backupSoul(dir) {
   return path.basename(target);
 }
 
+/**
+ * 人设真正生效的是 DB：bot_profile_versions.identity_source，当前版本由
+ * bot_profiles.current_version 指定；SOUL.md 只是镜像，宿主只在建主任务那一刻
+ * 才回读文件。所以只改文件不生效，这里同步插一条新版本并抬 current_version。
+ * 旧版本行保留，回退就是把 current_version 指回去。
+ */
+function bumpIdentityVersion(botId, text) {
+  const db = mainDbPath();
+  if (!db) throw new Error('找不到 Cindy 主数据库，无法写入人设版本');
+  const id = String(botId).replace(/'/g, "''");
+
+  let row;
+  try {
+    row = execFileSync(
+      'sqlite3',
+      [
+        '-readonly',
+        db,
+        `select p.current_version || '|' || ifnull((select max(version) from bot_profile_versions where bot_id = p.id), 0) from bot_profiles p where p.id = '${id}';`
+      ],
+      { encoding: 'utf8', timeout: 5000 }
+    ).trim();
+  } catch (err) {
+    throw new Error('读取伙伴版本失败：' + err.message);
+  }
+  const [current, max] = row.split('|').map(Number);
+  if (!current || !max) throw new Error('伙伴没有可用的版本记录：' + botId);
+
+  const next = max + 1;
+  const now = Date.now();
+  const sql = [
+    'PRAGMA busy_timeout=8000;',
+    'BEGIN IMMEDIATE;',
+    `INSERT INTO bot_profile_versions (id, bot_id, version, identity_source, capabilities_json, created_at)
+SELECT '${id}:v' || ${next}, '${id}', ${next}, '${String(text).replace(/'/g, "''")}', capabilities_json, ${now}
+  FROM bot_profile_versions WHERE bot_id = '${id}' AND version = ${current};`,
+    `UPDATE bot_profiles SET current_version = ${next}, updated_at = ${now} WHERE id = '${id}' AND current_version = ${current};`,
+    'COMMIT;'
+  ].join('\n');
+
+  try {
+    execFileSync('sqlite3', ['-bail', db], { input: sql, encoding: 'utf8', timeout: 15000 });
+  } catch (err) {
+    throw new Error('写入伙伴版本失败：' + err.message);
+  }
+
+  const check = execFileSync(
+    'sqlite3',
+    ['-readonly', db, `select current_version from bot_profiles where id = '${id}';`],
+    { encoding: 'utf8', timeout: 5000 }
+  ).trim();
+  if (Number(check) !== next) throw new Error('版本写入没有生效（current_version=' + check + '）');
+  return next;
+}
+
 function syncSoul(params) {
   const src = findPartner(params.srcId);
   const dst = findPartner(params.dstId);
@@ -265,7 +320,8 @@ function syncSoul(params) {
 
   const backup = backupSoul(dstDir);
   writeAtomic(path.join(dstDir, 'SOUL.md'), content);
-  return { ok: true, backup, bytes: Buffer.byteLength(content, 'utf8') };
+  const version = bumpIdentityVersion(dst.id, content);
+  return { ok: true, backup, bytes: Buffer.byteLength(content, 'utf8'), version };
 }
 
 /** 在 MEMORY.md 的 type 分组末尾插入一行；没有该分组就新建。 */
