@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>伙伴同步</title>
+<style>
+:root {
+  --bg: var(--panel-bg, #f7f7f5);
+  --card: var(--surface, #ffffff);
+  --fg: var(--text-primary, #1a1a1a);
+  --dim: var(--text-secondary, #8a8a8e);
+  --line: var(--border-default, #e8e8e4);
+  --fill: rgba(0, 0, 0, 0.035);
+  --accent: #1a1a1a;
+  --accent-fg: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: var(--panel-bg, #131315);
+    --card: var(--surface, #1b1b1d);
+    --fg: var(--text-primary, #f2f2f7);
+    --dim: var(--text-secondary, #98989f);
+    --line: var(--border-default, #2a2a2c);
+    --fill: rgba(255, 255, 255, 0.05);
+    --accent: #f2f2f7;
+    --accent-fg: #1a1a1a;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body {
+  font: 13px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+  padding: 14px 14px 20px;
+  -webkit-font-smoothing: antialiased;
+}
+#mark { display: none; }
+
+.row { display: flex; gap: 10px; }
+.field { flex: 1; min-width: 0; }
+.field > span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--dim);
+  letter-spacing: 0.02em;
+}
+.combo { position: relative; }
+.combo-btn {
+  width: 100%;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+.combo-btn:hover { border-color: var(--dim); }
+.combo-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  background: var(--fill);
+}
+.combo-avatar.letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--dim);
+}
+.combo-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.combo-count { color: var(--dim); font-size: 11px; flex: none; }
+.combo-caret { color: var(--dim); font-size: 9px; flex: none; }
+.combo-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 5px);
+  z-index: 30;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+  display: none;
+}
+.combo.open .combo-list { display: block; }
+.combo-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.combo-item:hover { background: var(--fill); }
+.combo-item.active { background: var(--fill); }
+.combo-text { min-width: 0; flex: 1; }
+.combo-text .combo-name { font-size: 12.5px; }
+.combo-text .combo-count { font-size: 11px; }
+
+.card {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.035);
+}
+@media (prefers-color-scheme: dark) {
+  .card { box-shadow: none; }
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.card-head .meta {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--dim);
+}
+.toggle {
+  border: 0;
+  background: none;
+  color: var(--dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.toggle:hover { background: var(--fill); color: var(--fg); }
+
+pre {
+  margin: 0 0 10px;
+  padding: 10px;
+  max-height: 170px;
+  overflow: auto;
+  background: var(--fill);
+  border-radius: 7px;
+  font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.primary {
+  width: 100%;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.primary:hover { opacity: 0.86; }
+.primary:disabled { opacity: 0.32; cursor: default; }
+
+.sect-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 16px 2px 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.sect-head .meta { font-size: 11px; font-weight: 400; color: var(--dim); }
+
+.list { display: flex; flex-direction: column; gap: 2px; }
+
+.cols { display: flex; gap: 10px; align-items: flex-start; }
+.col { flex: 1; min-width: 0; }
+.col-head {
+  margin: 0 2px 5px;
+  font-size: 11px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.col .item { padding: 7px 8px; }
+.col .item-title { font-size: 12px; }
+.col .item-desc { font-size: 10.5px; }
+.col .item-type, .col .item-flag { font-size: 9.5px; padding: 0 4px; }
+.item.ro { cursor: default; }
+.item.ro:hover { background: none; }
+.item {
+  display: flex;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.item:hover { background: var(--fill); }
+.item input {
+  margin: 3px 0 0;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  accent-color: var(--accent);
+}
+.item-body { min-width: 0; flex: 1; }
+.item-title {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 450;
+}
+.title-text { overflow-wrap: anywhere; }
+.mem-toggle { margin-left: auto; flex: none; }
+.mem-body {
+  margin: 7px 0 0;
+  padding: 9px 10px;
+  max-height: 220px;
+  overflow: auto;
+  background: var(--fill);
+  border-radius: 6px;
+  font: 11px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.item-desc {
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--dim);
+  overflow-wrap: anywhere;
+}
+.item-type {
+  display: inline-block;
+  margin-left: 0;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--fill);
+  color: var(--dim);
+  font-size: 10px;
+  font-weight: 400;
+  vertical-align: 1px;
+}
+.item-flag {
+  display: inline-block;
+  margin-left: 0;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(58, 157, 93, 0.12);
+  color: #3a9d5d;
+  font-size: 10px;
+  font-weight: 400;
+  vertical-align: 1px;
+}
+@media (prefers-color-scheme: dark) {
+  .item-flag {
+    background: rgba(74, 222, 128, 0.14);
+    color: #4ade80;
+  }
+}
+.item-flag.new {
+  background: var(--fill);
+  color: var(--dim);
+}
+.mem-del { color: var(--dim); }
+.mem-del.danger { color: #d9534f; font-weight: 600; }
+.item.exists {
+  opacity: 0.55;
+  cursor: default;
+}
+.item.exists:hover { background: none; }
+
+.empty {
+  padding: 18px 0;
+  text-align: center;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+#syncMem {
+  position: sticky;
+  bottom: 0;
+  margin-top: 10px;
+  box-shadow: 0 -6px 14px var(--bg);
+}
+
+#msg {
+  min-height: 18px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--dim);
+  text-align: center;
+}
+#msg.err { color: #d9534f; }
+#msg.ok { color: #3a9d5d; }
+</style>
+</head>
+<body>
+<div id="mark">脚本未执行</div>
+
+<div class="row">
+  <div class="field"><span>源伙伴</span><div class="combo" id="srcCombo"></div></div>
+  <div class="field"><span>目标伙伴</span><div class="combo" id="dstCombo"></div></div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <span>Soul</span>
+    <span class="meta" id="soulSize"></span>
+    <button class="toggle" id="toggleSoul">展开</button>
+  </div>
+  <pre id="soulPreview" hidden></pre>
+  <button class="primary" id="syncSoul">同步 Soul 到目标伙伴</button>
+</div>
+
+<div class="sect-head">
+  <span>差异记忆</span>
+  <span class="meta" style="margin-left:auto">
+    <button class="toggle" id="checkAll">全选</button>
+    <button class="toggle" id="checkNone">清空</button>
+  </span>
+</div>
+<div class="cols">
+  <div class="col">
+    <div class="col-head" id="srcColHead">源</div>
+    <div id="list" class="list"></div>
+  </div>
+  <div class="col">
+    <div class="col-head" id="dstColHead">目标</div>
+    <div id="dstList" class="list"></div>
+  </div>
+</div>
+
+<div class="sect-head" id="commonHead">
+  <span>重叠记忆</span>
+  <span class="meta" id="commonCount"></span>
+</div>
+<div class="cols" id="commonSect">
+  <div class="col">
+    <div class="col-head" id="commonSrcHead">源</div>
+    <div id="commonSrcList" class="list"></div>
+  </div>
+  <div class="col">
+    <div class="col-head" id="commonDstHead">目标</div>
+    <div id="commonDstList" class="list"></div>
+  </div>
+</div>
+<button class="primary" id="syncMem" disabled>同步选中的记忆</button>
+
+<div id="msg"></div>
+
+<script src="ui2.js"></script>
+</body>
+</html>

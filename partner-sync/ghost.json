@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 3,
+  "id": "partner-sync",
+  "name": "伙伴同步",
+  "description": "在右侧栏列出所有伙伴，查看某个伙伴的 Soul 和逐条记忆，把选中的 Soul 或记忆同步到另一个伙伴。Soul 覆盖前自动备份，记忆追加并按正文去重，源伙伴内容不动。",
+  "whenToUse": "需要把某个伙伴的 Soul 或记忆复制到另一个伙伴、对比各伙伴的人设、迁移或备份记忆时找我",
+  "version": "1.0.0",
+  "minCindyVersion": "0.1.120",
+  "entry": "main.js",
+  "icon": "assets/icon.png",
+  "command": "伙伴同步",
+  "panel": {
+    "title": "伙伴同步",
+    "html": "ui2.html",
+    "position": "right"
+  },
+  "tools": [
+    {
+      "name": "partner_sync_list",
+      "description": "列出本机所有伙伴，以及每个伙伴的 Soul 大小和记忆条数。用户问“有哪些伙伴”“谁有多少记忆”“哪个伙伴的 Soul 最长”时用。同步操作请让用户在右侧栏「伙伴同步」面板里完成。",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ],
+  "node": {
+    "entry": "node/worker.cjs",
+    "protocol": "json-rpc-stdio",
+    "lifecycle": "on-demand",
+    "idleTimeoutSeconds": 300
+  }
+}
